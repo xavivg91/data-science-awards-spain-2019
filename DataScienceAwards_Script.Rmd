@@ -1,0 +1,1623 @@
+---
+title: "Transformando el mundo del baloncesto a través de Sports Analytics en España"
+author: "Xavier Vivancos García"
+date: '`r Sys.Date()`'
+output:
+  html_document:
+    toc: yes
+    number_sections: yes
+    code_folding: hide
+    theme: sandstone  
+    highlight: tango
+---
+
+<center><img
+src="https://i.imgur.com/NrtZvCd.png">
+</center>
+
+# **Presentación** 
+
+Bienvenidos a mi entrega del reto de Sports Analytics para el Data Science Awards Spain 2019. 
+
+Me llamo [Xavier Vivancos](https://www.linkedin.com/in/xavier-vivancos-garcia-2ab8a6115/), de Barcelona, y soy graduado en [Ingeniería de Sistemas Audiovisuales](https://www.upf.edu/es/web/graus/grau-enginyeria-sistemes-audiovisuals) por la Universidad Pompeu Fabra (2016). Posteriormente, viendo el _boom_ del Big Data y la gran cantidad de oportunidades laborales que generaba este ámbito, decidí cambiar el rumbo de mi trayectoria académica y cursé el Máster en [Inteligencia de Negocio y Big Data Analytics](https://estudios.uoc.edu/es/masters-posgrados-especializaciones/master/informatica-multimedia-telecomunicacion/inteligencia-negocio-big-data/presentacion) en la UOC (finalizado en 2018). Fue un movimiento arriesgado, puesto que no sabía con certeza si iba a agradarme o no. Por suerte, a día de hoy, puedo decir que no me equivoqué en absoluto y que me encantaría enfocar mi carrera profesional en la Ciencia de Datos. 
+
+Aunque actualmente me dedico a tareas más relacionadas con Business Intelligence, mi deseo es el de poder trabajar como Data Scientist. En concreto, me encantaría adentrarme en el mundo de Sports Analytics. Debida a mi corta experiencia en este ámbito, decidí crearme una cuenta y colaborar regularmente en [Kaggle](https://www.youtube.com/watch?v=TNzDMOg_zsw), con el objetivo de crear un portafolio que demuestre mis capacidades (podéis visitar mi perfil [aquí](https://www.kaggle.com/xvivancos)). Mis trabajos en la plataforma se basan, sobre todo, en narrar historias a partir del análisis de la información. ¡Me encanta el _data storytelling_!
+
+# **Motivación**
+
+¡...y también me encanta el baloncesto! Llevo jugando en equipo desde bien pequeño y es parte de mi vida. No disfruto sólo como jugador, sino también como espectador (tanto baloncesto europeo como NBA). Además, me gusta estar actualizado acerca de cualquier noticia (fichajes, resultados, polémicas, etc.) que tenga relación con este deporte. Por cierto, ¡una buena parte de mis trabajos en Kaggle son de baloncesto!
+
+Cuando un amigo me comentó que uno de los posibles retos del torneo era de analítica deportiva aplicada al baloncesto, no me lo pensé dos veces y decidí participar.
+
+# **Herramientas**
+
+He decidido utilizar el lenguaje de programación R para la elaboración del reto. ¿Por qué? Porque es el principal lenguaje que aprendí y utilicé durante el Máster. También lo uso para mis análisis en Kaggle. Es con el que llevo más tiempo, el que más domino y con el que me siento más cómodo. En concreto, he trabajado con el entorno de trabajo de RStudio, utilizando un archivo R Markdown con el que puedo combinar código y letra, y pudiéndolo exportar a formato HTML para su posterior lectura. 
+
+# **Lectura e inspección de datos** {.tabset .tabset-fade .tabset-pills}
+
+Los datos proporcionados son los siguientes:
+
+* **ACB_Players_18-19.xlsx**. Data set con estadísticas avanzadas de los jugadores de la ACB durante la temporada 2018-2019.
+
+* **ACB_Players_2012to2018.xlsx**. Data set con estadísticas avanzadas de los jugadores de la ACB desde la temporada 2011-2012 hasta la temporada 2017-2018.
+
+* **ACB_Teams_18-19.xlsx**. Data set con estadísticas avanzadas de los equipos de la ACB durante la temporada 2018-2019.
+
+Antes de entrar en los análisis, vamos a leer e inspeccionar los diferentes archivos, analizando las observaciones, variables y su tipo. En el fichero de los equipos de la ACB voy a añadir tres columnas nuevas para enriquecer el análisis: 
+
+* Columna `Playoffs`. Nos indica qué equipos se clasificaron en los Playoffs de la Liga Endesa en la temporada 2018/19.
+
+* Columna `Puntos recibidos`. Nos indica los puntos recibidos por partido de cada equipo de la Liga Endesa durante la Liga Regular de la temporada 2018/19. (Fuente: www.acb.com)
+
+* Columna `Posicion`. Posición en la clasificación de los equipos de la Liga Endesa al finalizar la temporada 2018/19. 
+
+```{r message=FALSE, warning=FALSE}
+# Librerías
+library(openxlsx)
+library(tidyverse)
+library(knitr)
+library(magick)
+library(grid)
+library(plotly)
+library(gganimate)
+library(gridExtra)
+library(factoextra)
+library(GGally)
+library(caret)
+library(C50)
+library(corrplot)
+
+# Lectura de datos
+ACB_Players_1819 <- read.xlsx("C:/Users/xviva/Desktop/Xavier/Formacion/Data Science Awards 2019/ACB_Players_18-19.xlsx", rowNames=TRUE)
+ACB_Players_1218 <- read.xlsx("C:/Users/xviva/Desktop/Xavier/Formacion/Data Science Awards 2019/ACB_Players_2012to2018.xlsx")
+ACB_Teams_1819 <- read.xlsx("C:/Users/xviva/Desktop/Xavier/Formacion/Data Science Awards 2019/ACB_Teams_18-19.xlsx", rowNames=TRUE)
+
+# Añadimos una columna nueva: Playoffs 
+ACB_Teams_1819$Playoffs <- c("No clasificado", "No clasificado", "Clasificado", "Clasificado",
+                             "No clasificado", "No clasificado", "Clasificado", "Clasificado",
+                             "No clasificado", "No clasificado", "No clasificado", "Clasificado",
+                             "No clasificado", "No clasificado", "Clasificado", "No clasificado",
+                             "Clasificado", "Clasificado")
+
+# Añadimos una columna nueva: Puntos recibidos
+ACB_Teams_1819$`Puntos recibidos` <- c(84.35, 82.09, 80.38, 76.18, 84.50, 79.71, 82.18, 74.97, 88.85, 
+                                       81.91, 87.68, 78.76, 83.03, 83.50, 85.21, 81.91, 81.56, 78.62)
+
+# Añadimos una columna nueva: Posicion 
+ACB_Teams_1819$Posicion <- c(18, 17, 7, 2, 12, 9, 8, 3, 13, 
+                             10, 16, 1, 15, 11, 6, 14, 5, 4)
+```
+
+## ACB_Players_18-19
+
+```{r}
+# Estructura
+glimpse(ACB_Players_1819)
+```
+
+## ACB_Players_2012to2018
+
+```{r}
+# Estructura
+glimpse(ACB_Players_1218)
+```
+
+## ACB_Teams_18-19
+
+```{r}
+# Estructura
+glimpse(ACB_Teams_1819)
+```
+
+# **Correlaciones**  {.tabset .tabset-fade .tabset-pills}
+
+Estudiemos la correlación entre las diferentes variables estadísticas de los conjuntos de datos. Empezamos primero con el de los jugadores y después con el de los equipos (temporada 2018/19). En el caso de los equipos, no tenemos en cuentra los minutos y partidos, puesto que todos han jugado lo mismo. 
+
+## Jugadores
+
+```{r}
+# Correlaciones entre las estadísticas de los jugaroes (2018/19)
+corr <- round(cor(ACB_Players_1819[, c(9:46)]), 1)
+corrplot(corr, type="upper", method="color", tl.cex=0.7)
+```
+
+## Equipos
+
+```{r}
+# Correlaciones entre las estadísticas de los equipos (2018/19)
+corr <- round(cor(ACB_Teams_1819[, c(5:39, 41)]), 1)
+corrplot(corr, type="upper", method="color", tl.cex=0.7)
+```
+
+
+# **Jugadores y equipos más destacados (2018/19)** 
+
+En esta sección vamos a conocer, primeramente, los jugadores más destacados durante la Liga Regular de la temporada 2018/19 en las categorías cuantificables más básicas e importantes del baloncesto: puntos, rebotes, asistencias, tapones, recuperaciones, pérdidas y faltas personales. También analizamos los porcentajes de los lanzamientos a canasta (desglosados en tiros libres, tiros de dos puntos y triples). Además, repetimos el mismo análisis para los equipos de la Liga Endesa. 
+
+## Estadisticas individuales 
+
+### Positivas {.tabset .tabset-fade .tabset-pills}
+
+#### Puntos
+
+```{r fig.align='center', message=FALSE, warning=FALSE}
+# Top 5 anotadores en la temporada 2018/19
+ACB_Players_1819 %>%
+  filter(GP>10) %>%
+  select(Player, PPG) %>%
+  arrange(desc(PPG)) %>%
+  head(n=5) %>%
+  ggplot(aes(x=reorder(Player, -PPG), y=PPG)) +
+  geom_bar(aes(fill=PPG), stat="identity", color="black", show.legend=FALSE) +
+  geom_label(aes(label=PPG)) +
+  scale_fill_gradient(low="darkseagreen3", high="darkseagreen1") +
+  labs(title="Máximos anotadores de la Liga Endesa", 
+       subtitle="Temporada 2018/19", y="Puntos por partido") +
+  theme(panel.grid.major=element_blank(), 
+        panel.grid.minor=element_blank(),
+        panel.background=element_blank(), 
+        axis.line=element_line(colour="black"),
+        axis.title.x=element_blank()) +
+  ylim(0, 25)
+
+# Imagen de Nicolas Laprovittola en la visualización
+image <- image_read("C:/Users/xviva/Desktop/Xavier/Formacion/Data Science Awards 2019/Imagenes/Laprovittola.png") 
+grid.raster(image, x=0.18, y=0.75, height=0.2)
+
+# Imagen de Jake Wiley en la visualización
+image <- image_read("C:/Users/xviva/Desktop/Xavier/Formacion/Data Science Awards 2019/Imagenes/Wiley.png") 
+grid.raster(image, x=0.35, y=0.73, height=0.2)
+  
+# Imagen de Alessandro Gentile en la visualización
+image <- image_read("C:/Users/xviva/Desktop/Xavier/Formacion/Data Science Awards 2019/Imagenes/Gentile.png") 
+grid.raster(image, x=0.53, y=0.7, height=0.2)
+
+# Imagen de Askia Booker en la visualización
+image <- image_read("C:/Users/xviva/Desktop/Xavier/Formacion/Data Science Awards 2019/Imagenes/Booker.png") 
+grid.raster(image, x=0.71, y=0.69, height=0.2)
+
+# Imagen de Stan Okoye en la visualización
+image <- image_read("C:/Users/xviva/Desktop/Xavier/Formacion/Data Science Awards 2019/Imagenes/Okoye.png") 
+grid.raster(image, x=0.88, y=0.68, height=0.2)
+```
+
+#### Rebotes
+
+```{r fig.align='center'}
+# Top 5 reboteadores en la temporada 2018/19
+ACB_Players_1819 %>%
+  filter(GP>10) %>%
+  select(Player, RPG) %>%
+  arrange(desc(RPG)) %>%
+  head(n=5) %>%
+  ggplot(aes(x=reorder(Player, -RPG), y=RPG)) +
+  geom_bar(aes(fill=RPG), stat="identity", color="black", show.legend=FALSE) +
+  geom_label(aes(label=RPG)) +
+  scale_fill_gradient(low="darkseagreen3", high="darkseagreen1") +
+  labs(title="Máximos reboteadores de la Liga Endesa", 
+       subtitle="Temporada 2018/19", y="Rebotes por partido") +
+  theme(panel.grid.major=element_blank(),
+        panel.grid.minor=element_blank(),
+        panel.background=element_blank(), 
+        axis.line=element_line(colour="black"),
+        axis.title.x=element_blank()) +
+  ylim(0, 13)
+
+# Imagen de Nik Caner-Medley en la visualización
+image <- image_read("C:/Users/xviva/Desktop/Xavier/Formacion/Data Science Awards 2019/Imagenes/Caner-Medley.png") 
+grid.raster(image, x=0.18, y=0.74, height=0.2)
+
+# Imagen de Edy Tavares en la visualización
+image <- image_read("C:/Users/xviva/Desktop/Xavier/Formacion/Data Science Awards 2019/Imagenes/Tavares.png") 
+grid.raster(image, x=0.35, y=0.67, height=0.2)
+  
+# Imagen de Colton Iverson en la visualización
+image <- image_read("C:/Users/xviva/Desktop/Xavier/Formacion/Data Science Awards 2019/Imagenes/Iverson.png") 
+grid.raster(image, x=0.53, y=0.64, height=0.2)
+
+# Imagen de Gustavo Ayon en la visualización
+image <- image_read("C:/Users/xviva/Desktop/Xavier/Formacion/Data Science Awards 2019/Imagenes/Ayon.png") 
+grid.raster(image, x=0.71, y=0.62, height=0.2)
+
+# Imagen de Volodymyr Herun en la visualización
+image <- image_read("C:/Users/xviva/Desktop/Xavier/Formacion/Data Science Awards 2019/Imagenes/Herun.png") 
+grid.raster(image, x=0.88, y=0.61, height=0.2)
+```
+
+#### Asistencias 
+
+```{r fig.align='center'}
+# Top 5 asistentes en la temporada 2018/19
+ACB_Players_1819 %>%
+  filter(GP>10) %>%
+  select(Player, APG) %>%
+  arrange(desc(APG)) %>%
+  head(n=5) %>%
+  ggplot(aes(x=reorder(Player, -APG), y=APG)) +
+  geom_bar(aes(fill=APG), stat="identity", color="black", show.legend=FALSE) +
+  geom_label(aes(label=APG)) +
+  scale_fill_gradient(low="darkseagreen3", high="darkseagreen1") +
+  labs(title="Máximos asistentes de la Liga Endesa", 
+       subtitle="Temporada 2018/19", y="Asistencias por partido") +
+  theme(panel.grid.major=element_blank(),
+        panel.grid.minor=element_blank(),
+        panel.background=element_blank(), 
+        axis.line=element_line(colour="black"),
+        axis.title.x=element_blank()) +
+  ylim(0, 9)
+
+# Imagen de Nicolas Laprovittola en la visualización
+image <- image_read("C:/Users/xviva/Desktop/Xavier/Formacion/Data Science Awards 2019/Imagenes/Laprovittola.png") 
+grid.raster(image, x=0.18, y=0.77, height=0.2)
+
+# Imagen de Omar Cook en la visualización
+image <- image_read("C:/Users/xviva/Desktop/Xavier/Formacion/Data Science Awards 2019/Imagenes/Cook.png") 
+grid.raster(image, x=0.35, y=0.77, height=0.2)
+  
+# Imagen de Alex Renfroe en la visualización
+image <- image_read("C:/Users/xviva/Desktop/Xavier/Formacion/Data Science Awards 2019/Imagenes/Renfroe.png") 
+grid.raster(image, x=0.53, y=0.74, height=0.2)
+
+# Imagen de Thomas Heurtel en la visualización
+image <- image_read("C:/Users/xviva/Desktop/Xavier/Formacion/Data Science Awards 2019/Imagenes/Heurtel.png") 
+grid.raster(image, x=0.71, y=0.71, height=0.2)
+
+# Imagen de Dani Perez en la visualización
+image <- image_read("C:/Users/xviva/Desktop/Xavier/Formacion/Data Science Awards 2019/Imagenes/Perez.png") 
+grid.raster(image, x=0.88, y=0.68, height=0.2)
+```
+
+#### Tapones
+
+```{r fig.align='center'}
+# Top 5 taponadores en la temporada 2018/19
+ACB_Players_1819 %>%
+  filter(GP>10) %>%
+  select(Player, BPG) %>%
+  arrange(desc(BPG)) %>%
+  head(n=5) %>%
+  ggplot(aes(x=reorder(Player, -BPG), y=BPG)) +
+  geom_bar(aes(fill=BPG), stat="identity", color="black", show.legend=FALSE) +
+  geom_label(aes(label=BPG)) +
+  scale_fill_gradient(low="darkseagreen3", high="darkseagreen1") +
+  labs(title="Máximos taponadores de la Liga Endesa", 
+       subtitle="Temporada 2018/19", y="Tapones por partido") +
+  theme(panel.grid.major=element_blank(),
+        panel.grid.minor=element_blank(),
+        panel.background=element_blank(), 
+        axis.line=element_line(colour="black"),
+        axis.title.x=element_blank()) +
+  ylim(0, 3)
+
+# Imagen de Edy Tavares en la visualización
+image <- image_read("C:/Users/xviva/Desktop/Xavier/Formacion/Data Science Awards 2019/Imagenes/Tavares.png") 
+grid.raster(image, x=0.17, y=0.74, height=0.2)
+
+# Imagen de Alec Brown en la visualización
+image <- image_read("C:/Users/xviva/Desktop/Xavier/Formacion/Data Science Awards 2019/Imagenes/Brown.png") 
+grid.raster(image, x=0.35, y=0.64, height=0.2)
+  
+# Imagen de Cady Lalanne en la visualización
+image <- image_read("C:/Users/xviva/Desktop/Xavier/Formacion/Data Science Awards 2019/Imagenes/Lalanne.png") 
+grid.raster(image, x=0.52, y=0.56, height=0.2)
+
+# Imagen de Vincent Poirier en la visualización
+image <- image_read("C:/Users/xviva/Desktop/Xavier/Formacion/Data Science Awards 2019/Imagenes/Poirier.png") 
+grid.raster(image, x=0.7, y=0.54, height=0.2)
+
+# Imagen de Marko Todorovic en la visualización
+image <- image_read("C:/Users/xviva/Desktop/Xavier/Formacion/Data Science Awards 2019/Imagenes/Todorovic.png") 
+grid.raster(image, x=0.89, y=0.49, height=0.2)
+```
+
+#### Recuperaciones
+
+```{r fig.align='center'}
+# Top 5 ladrones en la temporada 2018/19
+ACB_Players_1819 %>%
+  filter(GP>10) %>%
+  select(Player, SPG) %>%
+  arrange(desc(SPG)) %>%
+  head(n=5) %>%
+  ggplot(aes(x=reorder(Player, -SPG), y=SPG)) +
+  geom_bar(aes(fill=SPG), stat="identity", color="black", show.legend=FALSE) +
+  geom_label(aes(label=SPG)) +
+  scale_fill_gradient(low="darkseagreen3", high="darkseagreen1") +
+  labs(title="Máximos recuperadores de la Liga Endesa", 
+       subtitle="Temporada 2018/19", y="Tapones por partido") +
+  theme(panel.grid.major=element_blank(),
+        panel.grid.minor=element_blank(),
+        panel.background=element_blank(), 
+        axis.line=element_line(colour="black"),
+        axis.title.x=element_blank()) +
+  ylim(0, 3)
+
+# Imagen de Dominique Sutton en la visualización
+image <- image_read("C:/Users/xviva/Desktop/Xavier/Formacion/Data Science Awards 2019/Imagenes/Sutton.png") 
+grid.raster(image, x=0.17, y=0.69, height=0.2)
+
+# Imagen de Luca Vildoza en la visualización
+image <- image_read("C:/Users/xviva/Desktop/Xavier/Formacion/Data Science Awards 2019/Imagenes/Vildoza.png") 
+grid.raster(image, x=0.34, y=0.61, height=0.2)
+  
+# Imagen de Omar Cook en la visualización
+image <- image_read("C:/Users/xviva/Desktop/Xavier/Formacion/Data Science Awards 2019/Imagenes/Cook.png") 
+grid.raster(image, x=0.52, y=0.59, height=0.2)
+
+# Imagen de Adam Hanga en la visualización
+image <- image_read("C:/Users/xviva/Desktop/Xavier/Formacion/Data Science Awards 2019/Imagenes/Hanga.png") 
+grid.raster(image, x=0.7, y=0.56, height=0.2)
+
+# Imagen de Dani Perez en la visualización
+image <- image_read("C:/Users/xviva/Desktop/Xavier/Formacion/Data Science Awards 2019/Imagenes/Perez.png") 
+grid.raster(image, x=0.88, y=0.56, height=0.2)
+```
+
+### Negativas {.tabset .tabset-fade .tabset-pills}
+
+#### Pérdidas 
+
+```{r fig.align='center'}
+# Top 5 jugadores con más pérdidas en la temporada 2018/19
+ACB_Players_1819 %>%
+  filter(GP>10) %>%
+  select(Player, TOV) %>%
+  arrange(desc(TOV)) %>%
+  head(n=5) %>%
+  ggplot(aes(x=reorder(Player, -TOV), y=TOV)) +
+  geom_bar(aes(fill=TOV), stat="identity", color="black", show.legend=FALSE) +
+  geom_label(aes(label=TOV)) +
+  scale_fill_gradient(low="tomato", high="tomato4") +
+  labs(title="Jugadores con más pérdidas de la Liga Endesa", 
+       subtitle="Temporada 2018/19", y="Pérdidas por partido") +
+  theme(panel.grid.major=element_blank(),
+        panel.grid.minor=element_blank(),
+        panel.background=element_blank(), 
+        axis.line=element_line(colour="black"),
+        axis.title.x=element_blank()) +
+  ylim(0, 7)
+
+# Imagen de Nicolas Laprovvitola en la visualización
+image <- image_read("C:/Users/xviva/Desktop/Xavier/Formacion/Data Science Awards 2019/Imagenes/Laprovittola.png") 
+grid.raster(image, x=0.17, y=0.75, height=0.2)
+
+# Imagen de Alex Renfroe en la visualización
+image <- image_read("C:/Users/xviva/Desktop/Xavier/Formacion/Data Science Awards 2019/Imagenes/Renfroe.png") 
+grid.raster(image, x=0.34, y=0.54, height=0.2)
+  
+# Imagen de Dominique Sutton en la visualización
+image <- image_read("C:/Users/xviva/Desktop/Xavier/Formacion/Data Science Awards 2019/Imagenes/Sutton.png") 
+grid.raster(image, x=0.52, y=0.53, height=0.2)
+
+# Imagen de Matic Rebec en la visualización
+image <- image_read("C:/Users/xviva/Desktop/Xavier/Formacion/Data Science Awards 2019/Imagenes/Rebec.png") 
+grid.raster(image, x=0.7, y=0.51, height=0.2)
+
+# Imagen de Alessandro Gentile en la visualización
+image <- image_read("C:/Users/xviva/Desktop/Xavier/Formacion/Data Science Awards 2019/Imagenes/Gentile.png") 
+grid.raster(image, x=0.88, y=0.5, height=0.2)
+```
+
+#### Faltas personales  
+
+```{r fig.align='center'}
+# Top 5 jugadores con más faltas personales en la temporada 2018/19
+ACB_Players_1819 %>%
+  filter(GP>10) %>%
+  select(Player, PF) %>%
+  arrange(desc(PF)) %>%
+  head(n=5) %>%
+  ggplot(aes(x=reorder(Player, -PF), y=PF)) +
+  geom_bar(aes(fill=PF), stat="identity", color="black", show.legend=FALSE) +
+  geom_label(aes(label=PF)) +
+  scale_fill_gradient(low="tomato", high="tomato4") +
+  labs(title="Jugadores con más faltas personales de la Liga Endesa", 
+       subtitle="Temporada 2018/19", y="Faltas personales por partido") +
+  theme(panel.grid.major=element_blank(),
+        panel.grid.minor=element_blank(),
+        panel.background=element_blank(), 
+        axis.line=element_line(colour="black"),
+        axis.title.x=element_blank()) +
+  ylim(0, 5)
+
+# Imagen de Nicolas Laprovvitola en la visualización
+image <- image_read("C:/Users/xviva/Desktop/Xavier/Formacion/Data Science Awards 2019/Imagenes/Dawson.png") 
+grid.raster(image, x=0.17, y=0.74, height=0.2)
+
+# Imagen de Jake Wiley en la visualización
+image <- image_read("C:/Users/xviva/Desktop/Xavier/Formacion/Data Science Awards 2019/Imagenes/Wiley.png") 
+grid.raster(image, x=0.34, y=0.73, height=0.2)
+  
+# Imagen de Marko Todorovic en la visualización
+image <- image_read("C:/Users/xviva/Desktop/Xavier/Formacion/Data Science Awards 2019/Imagenes/Todorovic.png") 
+grid.raster(image, x=0.52, y=0.72, height=0.2)
+
+# Imagen de Sadiel Rojas en la visualización
+image <- image_read("C:/Users/xviva/Desktop/Xavier/Formacion/Data Science Awards 2019/Imagenes/Rojas.png") 
+grid.raster(image, x=0.7, y=0.7, height=0.2)
+
+# Imagen de Vincent Poirier en la visualización
+image <- image_read("C:/Users/xviva/Desktop/Xavier/Formacion/Data Science Awards 2019/Imagenes/Poirier.png") 
+grid.raster(image, x=0.88, y=0.68, height=0.2)
+```
+
+### Porcentajes de tiro {.tabset .tabset-fade .tabset-pills}
+
+#### Tiros libres
+
+```{r fig.align='center'}
+# Top 5 jugadores con mejor porcentaje en tiros libres (FT%) en la temporada 2018/19
+ACB_Players_1819 %>%
+  filter(GP>10, FTM>1.5) %>%
+  select(Player, `FT%`) %>%
+  arrange(desc(`FT%`)) %>%
+  head(n=5) %>%
+  ggplot(aes(x=reorder(Player, -`FT%`), y=`FT%`)) +
+  geom_bar(aes(fill=`FT%`), stat="identity", color="black", show.legend=FALSE) +
+  geom_label(aes(label=paste0(round(`FT%`*100, 2), "%"))) +
+  scale_fill_gradient(low="paleturquoise", high="paleturquoise4") +
+  labs(title="Jugadores con mejor porcentaje en tiros libres (FT%) de la Liga Endesa", 
+       subtitle="Temporada 2018/19", y="Porcentaje en tiros libres (FT%)") +
+  theme(panel.grid.major=element_blank(),
+        panel.grid.minor=element_blank(),
+        panel.background=element_blank(), 
+        axis.line=element_line(colour="black"),
+        axis.title.x=element_blank()) +
+  scale_y_continuous(labels=scales::percent, limits=c(0, 1.4)) 
+
+# Imagen de Ryan Toolson en la visualización
+image <- image_read("C:/Users/xviva/Desktop/Xavier/Formacion/Data Science Awards 2019/Imagenes/Toolson.png") 
+grid.raster(image, x=0.2, y=0.76, height=0.2)
+
+# Imagen de Brian Roberts en la visualización
+image <- image_read("C:/Users/xviva/Desktop/Xavier/Formacion/Data Science Awards 2019/Imagenes/Roberts.png") 
+grid.raster(image, x=0.37, y=0.74, height=0.2)
+  
+# Imagen de Marcus Eriksson en la visualización
+image <- image_read("C:/Users/xviva/Desktop/Xavier/Formacion/Data Science Awards 2019/Imagenes/Eriksson.png") 
+grid.raster(image, x=0.54, y=0.73, height=0.2)
+
+# Imagen de Jaycee Carroll en la visualización
+image <- image_read("C:/Users/xviva/Desktop/Xavier/Formacion/Data Science Awards 2019/Imagenes/Carroll.png") 
+grid.raster(image, x=0.71, y=0.72, height=0.2)
+
+# Imagen de Kostas Vasiliadis en la visualización
+image <- image_read("C:/Users/xviva/Desktop/Xavier/Formacion/Data Science Awards 2019/Imagenes/Vasiliadis.png") 
+grid.raster(image, x=0.89, y=0.715, height=0.2)
+```
+
+#### Tiros de 2
+
+```{r fig.align='center'}
+# Top 5 jugadores con mejor porcentaje en tiros de 2 puntos (FG%) en la temporada 2018/19
+ACB_Players_1819 %>%
+  filter(GP>10, FGA>2.5) %>%
+  select(Player, `FG%`) %>%
+  arrange(desc(`FG%`)) %>%
+  head(n=5) %>%
+  ggplot(aes(x=reorder(Player, -`FG%`), y=`FG%`)) +
+  geom_bar(aes(fill=`FG%`), stat="identity", color="black", show.legend=FALSE) +
+  geom_label(aes(label=paste0(round(`FG%`*100, 2), "%"))) +
+  scale_fill_gradient(low="paleturquoise", high="paleturquoise4") +
+  labs(title="Jugadores con mejor porcentaje en tiros de 2 puntos (FG%) de la Liga Endesa", 
+       subtitle="Temporada 2018/19", y="Porcentaje en tiros de 2 (FG%)") +
+  theme(panel.grid.major=element_blank(),
+        panel.grid.minor=element_blank(),
+        panel.background=element_blank(), 
+        axis.line=element_line(colour="black"),
+        axis.title.x=element_blank()) +
+  scale_y_continuous(labels=scales::percent, limits=c(0, 1.1)) 
+
+# Imagen de Edy Tavares en la visualización
+image <- image_read("C:/Users/xviva/Desktop/Xavier/Formacion/Data Science Awards 2019/Imagenes/Tavares.png") 
+grid.raster(image, x=0.2, y=0.75, height=0.2)
+
+# Imagen de Emanuel Cate en la visualización
+image <- image_read("C:/Users/xviva/Desktop/Xavier/Formacion/Data Science Awards 2019/Imagenes/Cate.png") 
+grid.raster(image, x=0.37, y=0.7, height=0.2)
+  
+# Imagen de Artem Pustovyi en la visualización
+image <- image_read("C:/Users/xviva/Desktop/Xavier/Formacion/Data Science Awards 2019/Imagenes/Pustovyi.png") 
+grid.raster(image, x=0.54, y=0.69, height=0.2)
+
+# Imagen de Ondrej Balvin en la visualización
+image <- image_read("C:/Users/xviva/Desktop/Xavier/Formacion/Data Science Awards 2019/Imagenes/Balvin.png") 
+grid.raster(image, x=0.71, y=0.69, height=0.2)
+
+# Imagen de Gustavo Ayon en la visualización
+image <- image_read("C:/Users/xviva/Desktop/Xavier/Formacion/Data Science Awards 2019/Imagenes/Ayon.png") 
+grid.raster(image, x=0.89, y=0.68, height=0.2)
+```
+
+#### Triples
+
+```{r fig.align='center'}
+# Top 5 jugadores con mejor porcentaje en triples (3P%) en la temporada 2018/19
+ACB_Players_1819 %>%
+  filter(GP>10, `3PA`>2) %>%
+  select(Player, `3P%`) %>%
+  arrange(desc(`3P%`)) %>%
+  head(n=5) %>%
+  ggplot(aes(x=reorder(Player, -`3P%`), y=`3P%`)) +
+  geom_bar(aes(fill=`3P%`), stat="identity", color="black", show.legend=FALSE) +
+  geom_label(aes(label=paste0(round(`3P%`*100, 2), "%"))) +
+  scale_fill_gradient(low="paleturquoise", high="paleturquoise4") +
+  labs(title="Jugadores con mejor porcentaje en triples (3P%) de la Liga Endesa", 
+       subtitle="Temporada 2018/19", y="Porcentaje en triples (3P%)") +
+  theme(panel.grid.major=element_blank(),
+        panel.grid.minor=element_blank(),
+        panel.background=element_blank(), 
+        axis.line=element_line(colour="black"),
+        axis.title.x=element_blank()) +
+  scale_y_continuous(labels=scales::percent, limits=c(0, 1)) 
+
+# Imagen de Thaddeus McFadden en la visualización
+image <- image_read("C:/Users/xviva/Desktop/Xavier/Formacion/Data Science Awards 2019/Imagenes/McFadden.png") 
+grid.raster(image, x=0.2, y=0.61, height=0.2)
+
+# Imagen de Trey Thompkins en la visualización
+image <- image_read("C:/Users/xviva/Desktop/Xavier/Formacion/Data Science Awards 2019/Imagenes/Thompkins.png") 
+grid.raster(image, x=0.37, y=0.61, height=0.2)
+  
+# Imagen de Chris Singleton en la visualización
+image <- image_read("C:/Users/xviva/Desktop/Xavier/Formacion/Data Science Awards 2019/Imagenes/Singleton.png") 
+grid.raster(image, x=0.54, y=0.6, height=0.2)
+
+# Imagen de Matt Thomas en la visualización
+image <- image_read("C:/Users/xviva/Desktop/Xavier/Formacion/Data Science Awards 2019/Imagenes/Thomas.png") 
+grid.raster(image, x=0.71, y=0.6, height=0.2)
+
+# Imagen de Nick Zeisloft en la visualización
+image <- image_read("C:/Users/xviva/Desktop/Xavier/Formacion/Data Science Awards 2019/Imagenes/Zeisloft.png") 
+grid.raster(image, x=0.89, y=0.6, height=0.2)
+```
+
+## Estadísticas de equipo 
+
+### Positivas {.tabset .tabset-fade .tabset-pills}
+
+#### Rebotes 
+
+```{r fig.align='center'}
+# Equipos más reboteadores en la temporada 2018/19
+ACB_Teams_1819 %>%
+  arrange(desc(RPG)) %>%
+  ggplot(aes(x=reorder(Team, RPG), y=RPG)) +
+  geom_bar(aes(fill=Playoffs), stat="identity", color="black") +
+  geom_label(aes(label=RPG)) +
+  labs(title="Equipos más reboteadores de la Liga Endesa", 
+       subtitle="Temporada 2018/19", y="Rebotes por partido") +
+  theme_bw() +
+  theme(axis.title.y=element_blank(),
+        legend.position="bottom") +
+  coord_flip()
+```
+
+#### Asistencias 
+
+```{r fig.align='center'}
+# Equipos más asistentes en la temporada 2018/19
+ACB_Teams_1819 %>%
+  arrange(desc(APG)) %>%
+  ggplot(aes(x=reorder(Team, APG), y=APG)) +
+  geom_bar(aes(fill=Playoffs), stat="identity", color="black") +
+  geom_label(aes(label=APG)) +
+  labs(title="Equipos más asistentes de la Liga Endesa", 
+       subtitle="Temporada 2018/19", y="Asistencias por partido") +
+  theme_bw() +
+  theme(axis.title.y=element_blank(),
+        legend.position="bottom") +
+  coord_flip()
+```
+
+#### Tapones 
+
+```{r fig.align='center'}
+# Equipos más taponadores en la temporada 2018/19
+ACB_Teams_1819 %>%
+  arrange(desc(BPG)) %>%
+  ggplot(aes(x=reorder(Team, BPG), y=BPG)) +
+  geom_bar(aes(fill=Playoffs), stat="identity", color="black") +
+  geom_label(aes(label=BPG)) +
+  labs(title="Equipos más taponadores de la Liga Endesa", 
+       subtitle="Temporada 2018/19", y="Tapones por partido") +
+  theme_bw() +
+  theme(axis.title.y=element_blank(),
+        legend.position="bottom") +
+  coord_flip()
+```
+
+
+#### Recuperaciones 
+
+```{r fig.align='center'}
+# Equipos más recuperadores en la temporada 2018/19
+ACB_Teams_1819 %>%
+  arrange(desc(SPG)) %>%
+  ggplot(aes(x=reorder(Team, SPG), y=SPG)) +
+  geom_bar(aes(fill=Playoffs), stat="identity", color="black") +
+  geom_label(aes(label=SPG)) +
+  labs(title="Equipos con más recuperaciones de la Liga Endesa", 
+       subtitle="Temporada 2018/19", y="Recuperaciones por partido") +
+  theme_bw() +
+  theme(axis.title.y=element_blank(),
+        legend.position="bottom") +
+  coord_flip()
+```
+
+### Negativas {.tabset .tabset-fade .tabset-pills}
+
+#### Pérdidas 
+
+```{r fig.align='center'}
+# Equipos con más pérdidas en la temporada 2018/19
+ACB_Teams_1819 %>%
+  arrange(desc(TOV)) %>%
+  ggplot(aes(x=reorder(Team, TOV), y=TOV)) +
+  geom_bar(aes(fill=Playoffs), stat="identity", color="black") +
+  geom_label(aes(label=TOV)) +
+  labs(title="Equipos con más pérdidas de la Liga Endesa", 
+       subtitle="Temporada 2018/19", y="Pérdidas por partido") +
+  theme_bw() +
+  theme(axis.title.y=element_blank(),
+        legend.position="bottom") +
+  coord_flip()
+```
+
+#### Faltas personales 
+
+```{r fig.align='center'}
+# Equipos con más faltas personales en la temporada 2018/19
+ACB_Teams_1819 %>%
+  arrange(desc(PF)) %>%
+  ggplot(aes(x=reorder(Team, PF), y=PF)) +
+  geom_bar(aes(fill=Playoffs), stat="identity", color="black") +
+  geom_label(aes(label=PF)) +
+  labs(title="Equipos con más faltas personales de la Liga Endesa", 
+       subtitle="Temporada 2018/19", y="Faltas personales por partido") +
+  theme_bw() +
+  theme(axis.title.y=element_blank(),
+        legend.position="bottom") +
+  coord_flip()
+```
+
+
+### Porcentajes de tiro {.tabset .tabset-fade .tabset-pills}
+
+#### Tiros libres
+
+```{r fig.align='center'}
+# Equipos con mejor porcentaje en tiros libres (FT%) en la temporada 2018/19
+ACB_Teams_1819 %>%
+  arrange(desc(`FT%`)) %>%
+  ggplot(aes(x=reorder(Team, `FT%`), y=`FT%`)) +
+  geom_bar(aes(fill=Playoffs), stat="identity", color="black") +
+  geom_label(aes(label=paste0(round(`FT%`*100, 2), "%"))) +
+  labs(title="Equipos con mejor FT% de la Liga Endesa", 
+       subtitle="Temporada 2018/19", y="Porcentaje en tiros libres (FT%)") +
+  theme_bw() +
+  theme(axis.title.y=element_blank(),
+        legend.position="bottom") +
+  coord_flip()
+```
+
+#### Tiros de 2 
+
+```{r fig.align='center'}
+# Equipos con mejor porcentaje en tiros de 2 puntos (FG%) en la temporada 2018/19
+ACB_Teams_1819 %>%
+  arrange(desc(`FG%`)) %>%
+  ggplot(aes(x=reorder(Team, `FG%`), y=`FG%`)) +
+  geom_bar(aes(fill=Playoffs), stat="identity", color="black") +
+  geom_label(aes(label=paste0(round(`FG%`*100, 2), "%"))) +
+  labs(title="Equipos con mejor FG% de la Liga Endesa", 
+       subtitle="Temporada 2018/19", y="Porcentaje en tiros de 2 (FG%)") +
+  theme_bw() +
+  theme(axis.title.y=element_blank(),
+        legend.position="bottom") +
+  coord_flip()
+```
+
+#### Triples 
+
+```{r fig.align='center'}
+# Equipos con mejor porcentaje en triples (3P%) en la temporada 2018/19
+ACB_Teams_1819 %>%
+  arrange(desc(`3P%`)) %>%
+  ggplot(aes(x=reorder(Team, `3P%`), y=`3P%`)) +
+  geom_bar(aes(fill=Playoffs), stat="identity", color="black") +
+  geom_label(aes(label=paste0(round(`3P%`*100, 2), "%"))) +
+  labs(title="Equipos con mejor 3P% de la Liga Endesa", 
+       subtitle="Temporada 2018/19", y="Porcentaje en triples (3P%)") +
+  theme_bw() +
+  theme(axis.title.y=element_blank(),
+        legend.position="bottom") +
+  coord_flip()
+```
+
+
+### Ataque y defensa {.tabset .tabset-fade .tabset-pills}
+
+#### Puntos anotados 
+
+```{r fig.align='center'}
+# Equipos más ofensivos en la temporada 2018/19
+ACB_Teams_1819 %>%
+  arrange(desc(PPG)) %>%
+  ggplot(aes(x=reorder(Team, PPG), y=PPG)) +
+  geom_bar(aes(fill=Playoffs), stat="identity", color="black") +
+  geom_label(aes(label=PPG)) +
+  labs(title="Equipos más ofensivos de la Liga Endesa", 
+       subtitle="Temporada 2018/19", y="Puntos anotados por partido") +
+  theme_bw() +
+  theme(axis.title.y=element_blank(),
+        legend.position="bottom") +
+  coord_flip()
+```
+
+#### Puntos recibidos
+
+```{r fig.align='center'}
+# Equipos más defensivos en la temporada 2018/19
+ACB_Teams_1819 %>%
+  arrange(desc(`Puntos recibidos`)) %>%
+  ggplot(aes(x=reorder(Team, -`Puntos recibidos`), y=`Puntos recibidos`)) +
+  geom_bar(aes(fill=Playoffs), stat="identity", color="black") +
+  geom_label(aes(label=PPG)) +
+  labs(title="Equipos más defensivos de la Liga Endesa", 
+       subtitle="Temporada 2018/19", y="Puntos recibidos por partido") +
+  theme_bw() +
+  theme(axis.title.y=element_blank(),
+        legend.position="bottom") +
+  coord_flip()
+```
+
+
+
+## *Insights*
+
+Para obtener las visualizaciones superiores hemos filtrado las estadísticas a jugadores que hayan jugado más de 10 partidos, para evitar obtener resultados no significativos. Algunos *insights*:
+
+* Gran parte de los jugadores que aparecen en las visualizaciones de jugadores más destacados no van a continuar en el mismo equipo esta próxima temporada. La mayoría de ellos han jugado en equipos discretos, donde les es más fácil brillar y ser importantes, cuajar un buen año a nivel individual y revalorizarse para que puedan ser fichados por equipos más ambiciosos la próxima temporada. También encontramos el perfil de jugador de equipo grande, pero que por edad o por ser incapaz ya de mantener un nivel de exigencia alto, decide irse a un equipo acorde a sus características (Gustavo Ayon, por ejemplo). O Nik Caner-Medley, quien después de una larga carrera se retira del primer nivel para jugar en una liga menor como la de Japón. Veamos algunos casos,
+
+<center>
+
+|   **Jugador**                  |    **Temporada 2018/19**                    |  **Temporada 2019/20**                |
+|:-------------------------------|:--------------------------------------------|:--------------------------------------|
+| Nicolas Laprovittola           | Club Joventut Badalona                      | Real Madrid                           |
+| Jake Wiley                     | Herbalife Gran Canaria                      | Panathinaikos                         |
+| Stan Okoye                     | Casademont Zaragoza                         | Herbalife Gran Canaria                |
+| Nik Caner-Medley               | Movistar Estudiantes                        | Cyberdyne Ibaraki Robots (Japón)      | 
+| Colton Iverson                 | Iberostar Tenerife                          | Zenit de San Petersburgo              | 
+| Gustavo Ayon                   | Real Madrid                                 | Zenit de San Petersburgo              | 
+| Volodymyr Herun                | Cafés Candelas Breogán                      | Unicaja                               | 
+| Omar Cook                      | Movistar Estudiantes                        | Herbalife Gran Canaria                | 
+| Alex Renfroe                   | BAXI Manresa                                | BC Zenit San Petersburgo              | 
+
+</center> 
+
+* Movistar Estudiantes tiene hasta tres jugadores diferentes entre los mejores de tres apartados estadísticos diferentes: Omar Cook en asistencias, Alessandro Gentile en anotación y Nik Caner-Medley en rebotes. Vaya equipazo, puede pensar uno. Sin embargo, Movistar Estudiantes finalizó la temporada en undécima posición y con el objetivo prioritario de mantener la categoría. Ya lo suelen decir, que las individualidades no sirven de nada sin una cultura de trabajo en equipo. 
+
+* Parece que a Joan Plaza le gusta mucho la Liga Endesa, puesto que hasta tres jugadores de los que aparecen en las visualizaciones superiores jugarán esta próxima temporada en el Zenit de San Petersburgo: Gustavo Ayon, Colton Iverson y Alex Renfroe. A parte de estos tres, también Andrew Albicy (MoraBanc Andorra), Tim Abromaitis (pareja interior junto con Colton Iverson en Iberostar Tenerife) y Will Thomas (Valencia Basket) se incorporarán al proyecto ruso. Casi nada, buen equipo para competir en la exigente Euroliga. 
+
+* No hay mucho que comentar en cuanto a las estadísticas individuales. Los bases son los que reparten más asistencias, los pivots los que capturan más rebotes y colocan más tapones, los jugadores exteriores y ágiles los que recuperan más balones, etc. ¡Cómo siempre ha ocurrido en el baloncesto! Sin embargo, es curioso ver como hay cierta relación entre los jugadores más asistentes y los jugadores que más balones pierden (Nicolas Laprovittola y Alex Renfroe aparecen en las dos categorías). Suelen ser bases o jugadores con mucha responsabilidad ofensiva (Alessandro Gentile, por ejemplo). Jugadores que pasan mucho tiempo con el balón en las manos y que efectúan pases complicados para encontrar a sus compañeros en las mejores posiciones. 
+
+* Los pivots, como es habitual, dominan el porcentaje de tiro de dos puntos. Sus tiros son muy cercanos o incluso justo debajo del aro. Además, suelen ser los jugadores que más mates efectúan, aumentando considerablemente su porcentaje. 
+
+* ¿Qué se necesita para entrar en los Playoffs de la Liga Endesa? ¿Qué diferencia a un equipo de Playoff de otro equipo? Según las estadísticas, es imprescindible tener buenos porcentajes en tiros de dos y triples. En esta última temporada, 6 de los 8 primeros equipos en
+FG% y 3P% se clasificaron para Playoffs. Parece que también es importante cometer pocas faltas personales: los 5 primeros equipos en esta categoría consiguieron clasificarse. 
+
+* Me ha sorprendido la estadística de las pérdidas. Parece que no es tan importante cuidar el balón y tener pocas pérdidas para clasificarse en los Playoffs. ¡Sólo 3 de los 9 primeros equipos en este apartado estadístico se clasificaron para Playoffs! ¡El Top 3 con menos pérdidas no consiguió clasificarse! ¿Qué puede decirnos esta estadística? Quizás que arriesgando se pueden obtener mejores resultados que siendo conservador. 
+
+* ¡La defensa se impone al ataque! Parece que los equipos defensivos tienen más opciones de clasificarse en los Playoffs. De los 8 mejores equipos defensivos durante la Liga Regular, hasta 6 se clasificaron. Por otro lado, de los 8 mejores ofensivos, 5 lo lograron. 
+
+
+# **Porcentajes de tiro (2011/12 hasta 2017/18)**
+
+```{r}
+years <- c("2011/12", "2012/13", "2013/14", "2014/15",
+           "2015/16", "2016/17", "2017/18")
+
+# Porcentajes de tiro (temporada 2011/12 hasta 2017/18)
+ACB_Players_1218 %>%
+  mutate(Season=as.numeric(substr(temporada, 1, 4))) %>%
+  group_by(Season) %>%
+  summarise(`Tiros Libres`=mean(`FT%`),
+            `Tiros de 2`=mean(`FG%`),
+            `Triples`=mean(`3P%`)) %>%
+  gather(Tiro, Porcentaje, 2:4) %>%
+  ggplot(aes(x=Season, y=Porcentaje, colour=Tiro, group=Tiro)) +
+  geom_line(size=1) +
+  geom_point(aes(group=seq_along(Season)), size=2) +
+  scale_x_continuous(breaks=c(2011:2017), labels=years) +
+  scale_y_continuous(labels=scales::percent) +
+  theme_bw() +
+  theme(legend.title=element_blank(),
+        legend.position="bottom") +
+  labs(title="Porcentaje de tiro por temporada",
+       subtitle="Temporada 2011/12 hasta 2017/18",
+       x="Temporada") +
+  transition_reveal(Season) 
+```
+
+No se aprecian diferencias significativas en los porcentajes de tiro a lo largo de las últimas temporadas.
+
+* El porcentaje de triple se mantiene entre el rango 25%-30%.
+
+* El tiro de dos tiene un porcentaje situado siempre alrededor del 40%, mientras que en tiros libres el porcentaje gira entorno al 70%.
+
+# **Análisis por posiciones**
+
+## Jugadores por posición {.tabset .tabset-fade .tabset-pills}
+
+En esta sección vamos a estudiar el número de jugadores por posición a lo largo de las temporadas. Las posiciones especificadas en los datos proporcionados por el concurso son las siguientes: Center (C), Point-Guard (PG), Forward (F), Power-Forward (PF), Guard-Forward (GF), Shotting-Guard (SG), Small-Forward (SF), Foward-Center (FC) y Guard (G). Dicen que en el baloncesto moderno los pivots están desapareciendo, vamos a comprobar si es cierto o no. 
+
+Pues analizando el gráfico no se observa una tendencia de disminución o desaparición de los pivots en la Liga Endesa. Parece que de momento sólo en la NBA los pivots clásicos están llegando a su fin, dando paso a jugadores interiores más polivalentes, que incluso tiran triples y dan pases de canasta. 
+
+### Gráfico animado 
+
+```{r fig.align='center'}
+# Número de jugadores por posición (temporada 2011/12 hasta 2017/18)
+ACB_Players_1218 %>%
+  mutate(Season=as.numeric(substr(temporada, 1, 4))) %>%
+  filter(Pos!="F-C", Pos!="G-F") %>%
+  mutate(Pos=fct_recode(Pos, "Center"="C",
+                        "Point-Guard"="PG",
+                        "Forward"="F",
+                        "Power-Forward"="PF",
+                        "Guard-Forward"="GF",
+                        "Shooting-Guard"="SG",
+                        "Small-Forward"="SF",
+                        "Forward-Center"="FC",
+                        "Guard"="G")) %>%
+  group_by(Pos, Season) %>% 
+  summarise(Frecuencia=n()) %>%
+  ggplot(aes(x=Season, y=Frecuencia, colour=Pos, group=Pos)) +
+  geom_line(size=1) +
+  geom_point(aes(group=seq_along(Season)), size=2) +
+  scale_x_continuous(breaks=c(2011:2017), labels=years) +
+  labs(x="Temporada", y="Frecuencia", title="Número de jugadores por posición",
+       subtitle="Temporada 2011/12 hasta 2017/18") +
+  theme_bw() +
+  theme(legend.title=element_blank()) +
+  transition_reveal(Season) 
+```
+
+### Gráfico estático 
+
+```{r fig.align='center'}
+# Número de jugadores por posición (temporada 2011/12 hasta 2017/18)
+ACB_Players_1218 %>%
+  filter(Pos!="F-C", Pos!="G-F") %>%
+  mutate(Pos=fct_recode(Pos, "Center"="C",
+                        "Point-Guard"="PG",
+                        "Forward"="F",
+                        "Power-Forward"="PF",
+                        "Guard-Forward"="GF",
+                        "Shooting-Guard"="SG",
+                        "Small-Forward"="SF",
+                        "Forward-Center"="FC",
+                        "Guard"="G")) %>%
+  group_by(Pos, temporada) %>% 
+  summarise(Frecuencia=n()) %>%
+  ggplot(aes(x=temporada, y=Pos)) +
+  geom_tile(aes(fill=Frecuencia), stat="identity", color="black", show.legend=FALSE) +
+  geom_text(aes(label=Frecuencia)) +
+  scale_fill_gradient(low="white", high="firebrick3") +
+  labs(x="Temporada", y="Posiciones", title="Número de jugadores por posición",
+       subtitle="Temporada 2011/12 hasta 2017/18") +
+  theme_bw() 
+```
+
+## Estadísticas por posición 
+
+En este apartado vamos a analizar las principales estadísticas individuales medias por posición en la temporada 2018/19: puntos, rebotes, asistencias, recuperaciones, pérdidas de balón y faltas personales. 
+
+### Individuales
+
+```{r fig.align='center'}
+# Estadísticas medias por posición en la temporada 2018/19 
+ACB_Players_1819 %>%
+  filter(Position!="F-C", Position!="G-F") %>%
+  mutate(Position=fct_recode(Position, "Center"="C",
+                             "Point-Guard"="PG",
+                             "Forward"="F",
+                             "Power-Forward"="PF",
+                             "Guard-Forward"="GF",
+                             "Shooting-Guard"="SG",
+                             "Small-Forward"="SF",
+                             "Forward-Center"="FC",
+                             "Guard"="G")) %>%
+  group_by(Position) %>%
+  summarise(Puntos=round(mean(PPG), 2),
+            Rebotes=round(mean(RPG), 2),
+            Asistencias=round(mean(APG), 2),
+            Recuperaciones=round(mean(SPG), 2),
+            Tapones=round(mean(BPG), 2),
+            `Pérdidas`=round(mean(TOV), 2),
+            `Faltas personales`=round(mean(PF), 2)) %>%
+  gather(Stat, Valores, 2:8) %>%
+  ggplot(aes(x=Stat, y=Valores, fill=Position)) +
+  geom_bar(stat="identity", color="black", show.legend=FALSE) +
+  facet_wrap(~Position) +
+  labs(title="Estadísticas individuales medias por posición", subtitle="Temporada 2018/19") +
+  theme_bw() +
+  theme(axis.title.x=element_blank(),
+        axis.title.y=element_blank()) +
+  coord_flip()
+```
+
+Aunque los escoltas son los jugadores que tienen una media de anotación ligeramente más alta, parece que jugadores de cualquier posición son capaces de anotar puntos. Por lo demás, los resultados son los esperados: los jugadores interiores colocan más tapones y capturan más rebotes, y los exteriores reparten más asistencias y recuperan más balones (también pierden más). En cuanto a faltas personales, encontramos bastante igualdad en todas las posiciones. 
+
+### De tiro
+
+```{r fig.align='center'}
+# Porcentajes de tiro por posición en la temporada 2018/19
+ACB_Players_1819 %>%
+  filter(Position!="F-C", Position!="G-F") %>%
+  mutate(Position=fct_recode(Position, "Center"="C",
+                             "Point-Guard"="PG",
+                             "Forward"="F",
+                             "Power-Forward"="PF",
+                             "Guard-Forward"="GF",
+                             "Shooting-Guard"="SG",
+                             "Small-Forward"="SF",
+                             "Forward-Center"="FC",
+                             "Guard"="G")) %>%
+  group_by(Position) %>%
+  summarise(`Tiros Libres %`=mean(`FT%`),
+            `Tiros de 2 %`=mean(`FG%`),
+            `Triples %`=mean(`3P%`)) %>%
+  gather(Tiro, Valor, 2:4) %>%
+  ggplot(aes(x=Position, y=Valor)) +
+  geom_bar(stat="identity", color="black", aes(fill=Position), show.legend=FALSE) +
+  facet_wrap(~Tiro) +
+  labs(title="Porcentajes de tiro por posición", subtitle="Temporada 2018/19") +
+  scale_y_continuous(labels=scales::percent) +
+  theme_bw() +
+  theme(axis.title.x=element_blank(),
+        axis.title.y=element_blank(),
+        axis.text.x=element_text(angle=45, hjust=1)) 
+```
+
+Resultados bastante habituales en el mundo del baloncesto: los jugadores interiores son los que tienen un mayor porcentaje en tiros de dos puntos, mientras que los exteriores dominan en lanzamientos de larga distancia. Me ha sorprendido un detalle en el gráfico de tiros libres, y es que en esta última temporada 2018/19... ¡los aleros (Forward) han tenido un peor porcentaje que los pivots (Center)! Históricamente, muchos pivots son conocidos por sus mecánicas de tiro poco ortodoxas y sus bajos porcentajes en tiros libres. Shaquille O'neal, por ejemplo, uno de los mejores pivots de la historia de la NBA, falló 5.317 tiros libres a lo largo de toda su carrera.
+
+### Porcentajes de tiro por posición y por temporada {.tabset .tabset-fade .tabset-pills}
+
+¿Qué les pasó a los aleros en el porcentaje de tiros libres de la temporada 2015/16 a la 2016/17? ¡Es una disminución importante!
+
+#### Posiciones I
+
+```{r fig.align='center'}
+# Porcentajes de tiro por posición y por temporada 
+ACB_Players_1218 %>%
+  mutate(Season=as.numeric(substr(temporada, 1, 4))) %>%
+  filter(Pos %in% c("PG", "G", "SG", "GF")) %>%
+  mutate(Pos=fct_recode(Pos, "Point-Guard"="PG",
+                             "Guard-Forward"="GF",
+                             "Shooting-Guard"="SG",
+                             "Guard"="G")) %>%
+  group_by(Pos, Season) %>%
+  summarise(`Tiros Libres`=mean(`FT%`),
+            `Tiros de 2`=mean(`FG%`),
+            `Triples`=mean(`3P%`)) %>%
+  gather(Tiro, Porcentaje, 3:5) %>%
+  ggplot(aes(x=Season, y=Porcentaje, colour=Tiro, group=Tiro)) +
+  geom_line(size=1) +
+  geom_point(aes(group=seq_along(Season)), size=2) +
+  scale_y_continuous(labels=scales::percent) +
+  scale_x_continuous(breaks=c(2011:2017), labels=years) +
+  theme_bw() +
+  theme(legend.title=element_blank(),
+        axis.title.x=element_blank(),
+        axis.title.y=element_blank(),
+        legend.position="bottom") +
+  facet_grid(Pos ~ .) +
+  labs(title="Porcentajes de tiro por posición y por temporada",
+       subtitle="Temporada 2011/12 hasta 2017/18") +
+  transition_reveal(Season) 
+```
+
+#### Posiciones II
+
+```{r fig.align='center'}
+# Porcentajes de tiro por posición y por temporada 
+ACB_Players_1218 %>%
+  mutate(Season=as.numeric(substr(temporada, 1, 4))) %>%
+  filter(Pos %in% c("C", "F", "PF", "SF", "FC")) %>%
+  mutate(Pos=fct_recode(Pos, "Center"="C",
+                             "Forward"="F",
+                             "Power-Forward"="PF",
+                             "Small-Forward"="SF",
+                             "Forward-Center"="FC",)) %>%
+  group_by(Pos, Season) %>%
+  summarise(`Tiros Libres`=mean(`FT%`),
+            `Tiros de 2`=mean(`FG%`),
+            `Triples`=mean(`3P%`)) %>%
+  gather(Tiro, Porcentaje, 3:5) %>%
+  ggplot(aes(x=Season, y=Porcentaje, colour=Tiro, group=Tiro)) +
+  geom_line(size=1) +
+  geom_point(aes(group=seq_along(Season)), size=2) +
+  scale_y_continuous(labels=scales::percent) +
+  scale_x_continuous(breaks=c(2011:2017), labels=years) +
+  theme_bw() +
+  theme(legend.title=element_blank(),
+        axis.title.x=element_blank(),
+        axis.title.y=element_blank(),
+        legend.position="bottom") +
+  facet_grid(Pos ~ .) +
+  labs(title="Porcentajes de tiro por posición y por temporada",
+       subtitle="Temporada 2011/12 hasta 2017/18") +
+  transition_reveal(Season) 
+```
+
+# **Nacionalidades (2011/12 hasta 2017/18)** {.tabset .tabset-fade .tabset-pills}  
+
+Una de las críticas que suele recibir la Liga Endesa estas últimas temporadas es acerca de los jugadores nacionales: "¡Se está perdiendo el talento nacional!", "¡Las  canteras no dan oportunidades a los jóvenes jugadores españoles de subir al primer equipo!", "El futuro de la selección española es muy negro!" (y ahí están, acabadísimos, ganando Mundiales y con el billete para las Olimpiadas de Tokyo conseguido), etc. Veamos si estas críticas son acertadas o no.
+
+Pues... están en lo cierto. Si nos fijamos en el segundo gráfico de esta sección, a partir de la temporada 2013/14 se produce un importante  decrecimiento de jugadores nacionales hasta la temporada 2016/17 (de 102 a 61). Aunque los dos últimos años esta cifra ha incrementado un poco, todavía no hemos vuelto a alcanzar el máximo de 2016/17. 
+
+Y pensando un poco se me ocurren dos ejemplos actuales que escenifican perfectamente este problema:
+
+* Aleix Font, prometedor jugador de la cantera del FC Barcelona, ha tenido que emigrar al Brose Bamberg de Alemania ante las escasas oportunidades de jugar en el primer equipo. 
+
+* Santiago Aldama, flamante MVP del último Europeo Sub 18 donde España consiguió la medalla de oro, jugará esta próxima temporada en una universidad de Estados Unidos.
+
+Parece que los clubs prefieren fichar a jugadores extranjeros ya consagrados, buscando el rendimiento inmediato, antes que apostar por la cantera. Aunque dar oportunidades a los jóvenes pueda ser arriesgado a corto plazo, con paciencia y tiempo seguro que se obtendrían buenos resultados. Si esta misma tendencia hubiera pasado allá por finales de los 90, ¿qué habría sido de Pau Gasol o Juan Carlos Navarro, por ejemplo? ¿Puede que nos estemos perdiendo al próximo Pau Gasol o Juan Carlos Navarro? 
+
+## Temporada 2018/19
+
+```{r fig.align='center'}
+# Nacionalidades en la temporada 2018/19
+ACB_Players_1819 %>%
+  count(Nationality) %>%
+  arrange(desc(n)) %>%
+  head(n=10) %>%
+  ggplot(aes(x=reorder(Nationality, n), y=n)) +
+  geom_bar(stat="identity", aes(fill=n), color="black", show.legend=FALSE) +
+  geom_label(aes(label=n)) +
+  scale_fill_gradient(low="paleturquoise", high="paleturquoise4") +
+  labs(x="Nacionalidad", title="Nacionalidad de los jugadores",
+       subtitle="Temporada 2018/19") +
+  theme_bw() +
+  theme(axis.title.x=element_blank()) +
+  coord_flip()
+```
+
+
+
+## Temporada 2011/12 hasta 2017/18
+
+```{r fig.align='center'}
+# Nacionalidades (temporada 2011/12 hasta 2017/18)
+ACB_Players_1218 %>%
+  mutate(Season=as.numeric(substr(temporada, 1, 4))) %>%
+  filter(Nationality %in% c("Spain", "United Stated", "Serbia", "France",
+                            "Brazil", "Argentina", "Croatia", "Senegal",
+                            "Lithuania", "Czech Republic")) %>%
+  group_by(Nationality, Season) %>%
+  summarise(Count=n()) %>%
+  ggplot(aes(x=Season, y=Count, colour=Nationality, group=Nationality)) +
+  geom_line(size=1) +
+  geom_point(aes(group=seq_along(Season)), size=2) +
+  scale_x_continuous(breaks=c(2011:2017), labels=years) +
+  theme_bw() +
+  theme(legend.title=element_blank(),
+        axis.title.x=element_blank(),
+        axis.title.y=element_blank()) +
+  labs(title="Nacionalidad de los jugadores",
+       subtitle="Temporada 2011/12 hasta 2017/18") +
+  transition_reveal(Season)  
+```
+
+
+# **Peso y altura (2018/19)** {.tabset .tabset-fade .tabset-pills}
+
+En esta sección vamos a estudiar la distribución del peso y altura de los jugadores de la Liga Endesa. Podemos analizar entre qué rango de pesos y alturas se mueven los jugadores, en función de su posición: por lo general, los jugadores interiores son más altos y pesados, mientras que los exteriores son más bajitos y ligeros. 
+
+Para la elaboración de estos gráficos hemos simplificado las posiciones para mejorar la visualización, teniendo en cuenta sólo las principales: Point-Guard, Small-Forward, Shooting-Guard, Power-Forward y Center. 
+
+## Peso
+
+```{r fig.align='center', message=FALSE, warning=FALSE}
+# Distribución del peso de los jugadores en la temporada 2018/19
+ACB_Players_1819 %>%  
+  filter(Position!="F-C", Position!="G-F") %>%
+  mutate(Position=fct_recode(Position, "Center"="C",
+                             "Point-Guard"="PG",
+                             "Small-Forward"="F",
+                             "Power-Forward"="PF",
+                             "Shooting-Guard"="GF",
+                             "Shooting-Guard"="SG",
+                             "Small-Forward"="SF",
+                             "Center"="FC",
+                             "Point-Guard"="G")) %>%
+  ggplot(aes(x=Peso, fill=Position)) +
+  geom_density(alpha=0.5) +
+  labs(x="Peso (kg)", y="Densidad", title="Distribución del peso de los jugadores",
+       subtitle="Temporada 2018/19") +
+  theme_bw() +
+  theme(legend.title=element_blank(),
+        legend.position="bottom") +
+  xlim(60, 130)
+```
+
+## Altura
+
+```{r fig.align='center', message=FALSE, warning=FALSE}
+# Distribución de la altura de los jugadores en la temporada 2018/19
+ACB_Players_1819 %>%  
+  filter(Position!="F-C", Position!="G-F") %>%
+  mutate(Position=fct_recode(Position, "Center"="C",
+                             "Point-Guard"="PG",
+                             "Small-Forward"="F",
+                             "Power-Forward"="PF",
+                             "Shooting-Guard"="GF",
+                             "Shooting-Guard"="SG",
+                             "Small-Forward"="SF",
+                             "Center"="FC",
+                             "Point-Guard"="G")) %>%
+  ggplot(aes(x=altura, fill=Position)) +
+  geom_density(alpha=0.5) +
+  labs(x="Altura (cm)", y="Densidad", title="Distribución de la altura de los jugadores",
+       subtitle="Temporada 2018/19") +
+  theme_bw() +
+  theme(legend.title=element_blank(),
+        legend.position="bottom") 
+```
+
+
+# **Clusterización de jugadores**
+
+En este apartado vamos a llevar a cabo una categorización o clusterización de jugadores en base a su estilo de juego/estadísticas para encontrar jugadores que compartan patrones de juego. Para ello, utilizaremos el metodo de k-means. Se trata de un algoritmo de aprendizaje no supervisado (no hay un conocimiento a priori) que tiene como objetivo la partición de un conjunto de n observaciones en k grupos o clusters. 
+
+## Normalización 
+
+Antes de iniciar el proceso de segmentación es necesario normalizar los valores de las variables para eliminar el efecto de las distintas escalas de medida. Esto equivale a restarles su media y dividirlas por su desviación estándar (función `scale()` en R). 
+
+Vamos a utilizar todas las columnas numéricas, excepto la altura y peso de los jugadores. Es decir, incorporamos aquellas variables que forman parte de la analítica del baloncesto (puntos, minutos, rebotes, asistencias, estadísticas de analítica avanzada, etc.)
+
+```{r fig.align='center'}
+# Normalización de los atributos 
+ACB_Players_1819_Norm <- as.data.frame(scale(ACB_Players_1819[, -c(1:8)]))
+
+# Datos originales
+p1 <- ggplot(ACB_Players_1819, aes(x=PPG, y=RPG)) +
+  geom_point() +
+  labs(title="Datos originales", x="Puntos por partido",
+       y="Rebotes por partido") +
+  theme_bw()
+
+# Datos normalizados 
+p2 <- ggplot(ACB_Players_1819_Norm, aes(x=PPG, y=RPG)) +
+  geom_point() +
+  labs(title="Datos normalizados", x="Puntos por partido",
+       y="Rebotes por partido") +
+  theme_bw()
+
+# Subplot
+grid.arrange(p1, p2, ncol=2)
+```
+
+
+## Elección de clusters 
+
+Una segmentación óptima es aquella donde los individuos pertenecientes a un mismo grupo son lo más homogéneos posible y los individuos pertenecientes a distintos grupos son lo más heterogéneos posible. La varianza dentro de grupos debe ser reducida (individuos dentro de un mismo grupo tienen que ser similares) y la varianza entre grupos debe ser grande (individuos de distintos grupos tienen que ser distintos).
+
+A continuación definimos el modo de obtener un gráfico que nos represente la varianza entre grupos y dentro de grupos en función del número de grupos.
+
+```{r fig.align='center'}
+bss <- numeric()
+wss <- numeric()
+
+# Semilla
+set.seed(800)
+
+# Ejecutamos el algoritmo k-means para diferentes valores de k
+for(i in 1:10){
+
+  # Para cada k, calculamos betweenss y tot.withinss
+  bss[i] <- kmeans(ACB_Players_1819_Norm, centers=i)$betweenss
+  wss[i] <- kmeans(ACB_Players_1819_Norm, centers=i)$tot.withinss
+
+}
+
+# Creación de data frame
+df <- data.frame(k=1:10, bss, wss)
+df <- df %>% 
+  gather(Varianzas, Valores, 2:3) %>%
+  mutate(Varianzas=fct_recode(Varianzas, "Varianza dentro de grupos"="wss",
+                              "Varianza entre grupos"="bss"))
+
+# Varianza entre grupos y dentro de grupos vs Elección de k
+df %>%
+  ggplot(aes(x=k, y=Valores, colour=Varianzas)) +
+  geom_line() +
+  geom_point(size=2) +
+  labs(title="Varianza entre grupos y dentro de grupos vs Elección de k", 
+       y="Varianza", x="Número de clusters", subtitle="Método del codo") +
+  scale_x_continuous(breaks=1:10) +
+  geom_vline(xintercept=5, linetype="dotted") +
+  theme_bw() +
+  theme(legend.position="bottom",
+        legend.title=element_blank())
+```
+
+Para seleccionar el valor óptimo de k, se escoje ese punto en donde se dejan de producir variaciones significativas de los valores de varianza entre grupos y dentro de grupos (método del codo). En este caso, observando el gráfico no queda nada claro qué número de clusters sería el ideal, ya que no se aprecia con claridad ningún "codo" en las líneas. Aún así, después de ejecutar el algoritmo con diferentes valores y visualizar los resultados para cada ejecución, creemos que con 5 grupos se puede llevar a cabo una buena segmentación.  
+
+## Resultados
+
+A continuación podemos ver gráficamente la partición de los datos para diferentes valores de k. Hemos utilizado la función `fviz_cluster()`, que describe el conjunto de datos inicial en términos de nuevas variables (componentes) mediante la técnica PCA. En las visualizaciones, los datos están representados por las dos primeras componentes (Dim1 y Dim2).
+
+```{r fig.align='center'}
+# Semilla
+set.seed(800)
+
+# Ejecución del algoritmo k-means
+kmeans2 <- kmeans(ACB_Players_1819_Norm, centers=2)
+kmeans3 <- kmeans(ACB_Players_1819_Norm, centers=3)
+kmeans4 <- kmeans(ACB_Players_1819_Norm, centers=4)
+kmeans5 <- kmeans(ACB_Players_1819_Norm, centers=5)
+
+# Nueva columna con la asignación de los clusters a cada jugador 
+ACB_Players_1819$Cluster <- kmeans5$cluster
+
+# Visualización
+p1 <- fviz_cluster(kmeans2, geom="point", data=ACB_Players_1819_Norm) + ggtitle("K=2") + theme_bw()
+p2 <- fviz_cluster(kmeans3, geom="point", data=ACB_Players_1819_Norm) + ggtitle("K=3") + theme_bw()
+p3 <- fviz_cluster(kmeans4, geom="point", data=ACB_Players_1819_Norm) + ggtitle("K=4") + theme_bw()
+p4 <- fviz_cluster(kmeans5, geom="point", data=ACB_Players_1819_Norm) + ggtitle("K=5") + theme_bw()
+
+# Subplot
+grid.arrange(p1, p2, p3, p4, nrow=2)
+```
+
+
+¿Cómo luce la partición en nuestros datos de jugadores? En el siguiente gráfico lo podemos comprobar. No hemos utilizado todas las variables para favorecer una mejor visualización. 
+
+```{r fig.align='center', message=FALSE, warning=FALSE}
+# Clustering 
+ggpairs(ACB_Players_1819, 
+        columns=10:17, aes(colour=as.factor(Cluster), alpha=0.5),
+        lower=list(continuous="points"),
+        upper=list(continuous="blank"),
+        axisLabels="none", switch="both") +
+        theme_bw()
+```
+
+# **Clusterización de equipos**
+
+En este apartado vamos a seguir los mismos pasos que en la sección anterior, pero esta vez realizando una segmentación para los equipos de la Liga Endesa (temporada 2018/19). No vamos a utilizar las columnas de minutos por partido y partidos jugados, puesto que todos los equipos han jugado lo mismo.
+
+En este caso no incluiremos tantos detalles durante el proceso de clusterización, puesto que ya lo hemos hecho anteriormente. Empezamos con la normalización de los datos:
+
+```{r}
+# Normalización de los atributos 
+ACB_Teams_1819_Norm <- as.data.frame(scale(ACB_Teams_1819[, -c(1:4, 40)]))
+```
+
+Toca ahora decidir qué número de clusters escoger para la segmentación. Esperemos que el método del codo funcione mejor.
+
+```{r fig.align='center'}
+bss <- numeric()
+wss <- numeric()
+
+# Semilla
+set.seed(123)
+
+# Ejecutamos el algoritmo k-means para diferentes valores de k
+for(i in 1:10){
+
+  # Para cada k, calculamos betweenss y tot.withinss
+  bss[i] <- kmeans(ACB_Teams_1819_Norm, centers=i)$betweenss
+  wss[i] <- kmeans(ACB_Teams_1819_Norm, centers=i)$tot.withinss
+
+}
+
+# Creación de data frame
+df <- data.frame(k=1:10, bss, wss)
+df <- df %>% 
+  gather(Varianzas, Valores, 2:3) %>%
+  mutate(Varianzas=fct_recode(Varianzas, "Varianza dentro de grupos"="wss",
+                              "Varianza entre grupos"="bss"))
+
+# Varianza entre grupos y dentro de grupos vs Elección de k
+df %>%
+  ggplot(aes(x=k, y=Valores, colour=Varianzas)) +
+  geom_line() +
+  geom_point(size=2) +
+  labs(title="Varianza entre grupos y dentro de grupos vs Elección de k", 
+       y="Varianza", x="Número de clusters", subtitle="Método del codo") +
+  scale_x_continuous(breaks=1:10) +
+  geom_vline(xintercept=4, linetype="dotted") +
+  theme_bw() +
+  theme(legend.position="bottom",
+        legend.title=element_blank())
+```
+
+Menos mal, en este caso, parece claro que a partir de 4 clusters las variaciones de los valores de varianza entre grupos y dentro de grupos dejan de ser significativas. 
+
+Pues finalmente toca ejecutar el algoritmo y estudiar visualmente la partición:
+
+```{r fig.align='center'}
+# Semilla
+set.seed(123)
+
+# Ejecución del algoritmo k-means
+kmeans2 <- kmeans(ACB_Teams_1819_Norm, centers=2)
+kmeans3 <- kmeans(ACB_Teams_1819_Norm, centers=3)
+kmeans4 <- kmeans(ACB_Teams_1819_Norm, centers=4)
+kmeans5 <- kmeans(ACB_Teams_1819_Norm, centers=5)
+
+# Nueva columna con la asignación de los clusters a cada jugador 
+ACB_Teams_1819$Cluster <- kmeans4$cluster
+
+# Visualización
+p1 <- fviz_cluster(kmeans2, geom="point", data=ACB_Teams_1819_Norm) + ggtitle("K=2") + theme_bw()
+p2 <- fviz_cluster(kmeans3, geom="point", data=ACB_Teams_1819_Norm) + ggtitle("K=3") + theme_bw()
+p3 <- fviz_cluster(kmeans4, geom="point", data=ACB_Teams_1819_Norm) + ggtitle("K=4") + theme_bw()
+p4 <- fviz_cluster(kmeans5, geom="point", data=ACB_Teams_1819_Norm) + ggtitle("K=5") + theme_bw()
+
+# Subplot
+grid.arrange(p1, p2, p3, p4, nrow=2)
+```
+
+Veamos los resultados con un poco más de detalle:  
+
+```{r fig.align='center'}
+# Labels como rownames
+rownames(ACB_Teams_1819_Norm) <- ACB_Teams_1819$Team
+  
+# Clusters con los labels
+fviz_cluster(kmeans4, data=ACB_Teams_1819_Norm, star.plot=TRUE, repel=TRUE) + 
+  ggtitle("K=4") + 
+  theme_bw() +
+  theme(legend.position="none")
+```
+
+Vamos a comprobar algo curioso, si existe alguna relación entre la posición en la que han quedado los equipos de la Liga Endesa esta última temporada y el cluster al que pertenecen. 
+
+```{r fig.align='center'}
+# Relación entre la posición de los equipos y el cluster al que pertenecen 
+ACB_Teams_1819 %>%
+  mutate_at(vars(Cluster), factor) %>%
+  ggplot(aes(x=reorder(Team, -Posicion), y=Posicion, label=Posicion)) + 
+  geom_point(stat="identity", aes(col=Cluster), size=6.5)  +
+  geom_text(color="white", size=3) +
+  labs(title="Relación posición y cluster al que pertencen", 
+       subtitle="Temporada 2018/19", y="Posición en la Liga Endesa") + 
+  coord_flip() +
+  theme_bw() +
+  theme(axis.title.y=element_blank(),
+        legend.position="bottom")
+```
+
+¡Pues sí! Podríamos decir que la categorización ha dividido los equipos en nivel alto (equipos de Euroliga), medio-alto, medio y bajo. El caso más extraño es el de Rio Natura Monbus Obradoiro, categorizado en el cluster 4 (equipos de nivel medio-alto), pero clasificado cuarto por la cola en la Liga Endesa. Puede ser que su forma de jugar y estadísticas sean de equipo de nivel medio-alto, pero los resultados no le hayan acompañado esta última temporada. 
+
+# **Variables más influyentes**
+  
+En este apartado vamos a descubrir qué características son las más importantes de cara a clasificarse o no en los Playoffs de la Liga Endesa, incluyendo en el análisis atributos de estadística avanzada. Los árboles de decisión son capaces, en el momento de creación del modelo, de puntuar las variables más importantes de acuerdo a cómo son de idóneas para crear el corte que separa un conjunto de datos en dos subconjuntos. 
+
+En el primer apartado del reto intentamos adivinar, más a ojo, analizando los gráficos, qué variables son las más importantes de cara a lograr la clasificación para los Playoffs. En este apartado vamos a basarnos en un modelo, más fiable y preciso.  
+
+```{r message=FALSE, warning=FALSE}
+# Columnas a tener en cuenta
+variables <- ACB_Teams_1819[, 5:41]
+
+# Variable objetivo como categórica
+variables <- variables %>%
+  mutate_at(vars(Playoffs), factor)
+
+# Variable control
+control <- trainControl(method="repeatedcv", number=30, repeats=10)
+
+# Modelo
+model <- train(Playoffs~., data=variables, method="lvq", preProcess="scale", trControl=control)
+```
+
+Una vez creado el modelo, calculamos la importancia de las variables mediante la función `varImp()` de R. Hemos clasificado las estadísticas como básicas o avanzadas siguiendo el documento "Dataset-Variables-Description.docx" que nos proporciona el concurso. 
+
+```{r fig.align='center'}
+# Variables mas importantes
+imp <- as.data.frame(varImp(model, scale=FALSE)$importance)
+imp$Stat <- rownames(imp)
+rownames(imp) <- 1:nrow(imp)
+
+# Nueva columna para indicar si se trata de un indicador de estadística básica o avanzada
+imp$`Estadística` <- c(rep("Estadística básica", 18), rep("Estadística avanzada", 11), 
+                       "Estadística básica", rep("Estadística avanzada", 5), "Estadística básica")
+
+# Visualización
+imp %>%
+  arrange(desc(Clasificado)) %>%
+  head(n=15) %>%
+  ggplot(aes(x=reorder(Stat, Clasificado), y=Clasificado)) +
+  geom_bar(stat="identity", aes(fill=`Estadística`)) +
+  geom_label(aes(label=round(Clasificado, 2))) +
+  coord_flip() +
+  theme_bw() +
+  labs(title="Variables más influyentes para entrar en Playoffs",
+       subtitle="Temporada 2018/19", x="Indicador", y="Importancia") +
+  theme(legend.title=element_blank(),
+        legend.position="bottom")
+```
+
+Si un equipo de la Liga Endesa quiere clasificarse para los Playoffs, ya pueden los jugadores ponerse a practicar los tiros de dos puntos (FG%), ya que parece que se trata de un indicador imprescindible. Los tres siguientes en la clasificación son atributos de estadística avanzada:
+
+* **eDiff**. Diferencia entre ORtg (número de puntos que un equipo produce en 100 posesiones) y DRtg (número de puntos que un equipo recibe en 100 posesiones). 
+
+* **TRB%**. Porcentaje de la cantidad de rebotes capturados por un equipo sobre el total disponible. ¡Quién controla el rebote, controla el partido!
+
+* **Total.S%**. Suma del porcentaje de tiros de dos (FG%), tiros libres (FT%) y triples (3P%).
+
+Parece que una buena parte de los indicadores más importantes dependen de otros (se calculan como fórmulas), de manera que involucran varios aspectos del juego a la vez, y por esa razón es posible que tomen más importancia. ¿Qué hay de las variables menos influyentes? Veamos, 
+
+```{r fig.align='center'}
+# Variables menos influyentes
+imp %>%
+  arrange(desc(Clasificado)) %>%
+  tail(n=15) %>%
+  ggplot(aes(x=reorder(Stat, -Clasificado), y=Clasificado)) +
+  geom_bar(stat="identity", aes(fill=`Estadística`)) +
+  geom_label(aes(label=round(Clasificado, 2))) +
+  coord_flip() +
+  theme_bw() +
+  labs(title="Variables menos influyentes para entrar en Playoffs",
+       subtitle="Temporada 2018/19", x="Indicador", y="Importancia") +
+  theme(legend.title=element_blank(),
+        legend.position="bottom")
+```
+
+
+¿Cuál podría ser un posible árbol de decisión que nos permitiera predecir si un equipo va a clasificarse en Playoffs o no? En el siguiente trozo de código contruimos uno utilizando el paquete `C50`. Si tuvieramos las estadísticas de los equipos durante la Liga Regular 2019/20, por ejemplo, podríamos pronosticar si se clasificarían para Playoffs o no, utilizando los datos de este reto como entrenamiento del modelo.
+
+```{r}
+# Árbol de decisión
+model <- C50::C5.0(variables[, c(1:35, 37)],as.factor(variables$Playoffs))
+
+# Summary 
+summary(model)
+```
+
+La estructura del árbol creado es muy simple, utilizando sólo dos variables (Total.S% y BLK%) y cometiendo un error de clasificación. 
+
+# **Estadística avanzada**
+
+Veamos qué diferencias se producen en algunas variables de estadística avanzada en equipos ganadores y perdedores (clasificados o no clasificados para Playoffs).
+
+```{r fig.align='center'}
+# Distribución de TRB%, AST%, TOV%, STL% y BLK% 
+ACB_Teams_1819 %>%
+  select(`TRB%`, `AST%`, `TOV%`, `STL%`, `BLK%`, Playoffs) %>%
+  gather(Stat, Values, 1:5) %>%
+  ggplot(aes(x=Values/100, fill=Playoffs)) +
+  geom_density(alpha=0.5) +
+  facet_wrap(~Stat, scales="free") +
+  scale_x_continuous(labels=scales::percent) +
+  theme_bw() +
+  theme(legend.position="bottom",
+        axis.text.x=element_text(angle=45, hjust=1),
+        axis.title.x=element_blank()) +
+  labs(y="Densidad", title="Estadística avanzada", subtitle="Temporada 2018/19")
+```
+
+
+```{r fig.align='center'}
+# Equipos con más eDiff en la temporada 2018/19
+ACB_Teams_1819 %>%
+  arrange(desc(eDiff)) %>%
+  ggplot(aes(x=reorder(Team, eDiff), y=eDiff)) +
+  geom_bar(aes(fill=Playoffs), stat="identity", color="black") +
+  geom_label(aes(label=eDiff)) +
+  labs(title="Equipos con más eDiff de la Liga Endesa", 
+       subtitle="Temporada 2018/19", y="eDiff") +
+  theme_bw() +
+  theme(axis.title.y=element_blank(),
+        legend.position="bottom") +
+  coord_flip()
+```
+
+
+```{r fig.align='center'}
+# Equipos con más TRB% en la temporada 2018/19
+ACB_Teams_1819 %>%
+  arrange(desc(`TRB%`)) %>%
+  ggplot(aes(x=reorder(Team, `TRB%`), y=`TRB%`)) +
+  geom_bar(aes(fill=Playoffs), stat="identity", color="black") +
+  geom_label(aes(label=`TRB%`)) +
+  labs(title="Equipos con más TRB% de la Liga Endesa", 
+       subtitle="Temporada 2018/19", y="TRB%") +
+  theme_bw() +
+  theme(axis.title.y=element_blank(),
+        legend.position="bottom") +
+  coord_flip()
+```
+
+Por llegar un poco apurado a la entrega no he podido analizar más indicadores de estadística avanzada ni sacar las conclusiones o *insights* pertinentes en este apartado.
+
+
+# **Creación de KPI**
+
+En el conjunto de datos proporcionado he visto dos métricas que indican el rendimiento de los jugadores, calculadas mediante fórmulas que envuelven todos los aspectos del juego. Éstas son: 
+
+* **FIC** (*Floor Impact Counter*). Creada por Chris Reina en 2007, se calcula de la siguiente forma: Points + ORB + 0.75 DRB + AST + STL + BLK – 0.75 FGA – 0.375 FTA – TO – 0.5 PF
+
+* **PER** (*Player Efficiency Rating*). Estadística de eficiencia creada por John Hollinger y calculada a partir de complejas y largas fórmulas. Más información [aquí](https://en.wikipedia.org/wiki/Player_efficiency_rating).
+
+Sin embargo, no he visto nada de la valoración. La valoración es una fórmula estadística utilizada mayormente en Europa, similar a la eficiencia utilizada en la NBA, para medir el rendimiento de jugadores. Básicamente se calcula como la diferencia entre la suma de las estadísticas positivas y la suma de las estadísticas negativas. Dicho de otra forma:
+
+Valoración = (Puntos + Rebotes + Asistencias + Robos + Tapones + Faltas Recibidas) - (Tiros de Campo Fallados + Tiros Libres Fallados + Tapones Recibidos + Pérdidas + Faltas Realizadas)
+
+En nuestro conjunto de datos no disponemos de las faltas recibidas ni tampoco de los tapones recibidos, pero no tiene importancia, puede calcularse el indicador con las variables disponibles. En cuanto a los tiros fallados, los podemos calcular como la diferencia entre los tiros intentados y los tiros que acaban en canasta: FGA-FGM para los tiros de 2, 3PA-3PM para los triples y FTA-FTM para los tiros libres. 
+
+```{r fig.align='center'}
+# Creación de la estadística "Valoración" y visualización
+ACB_Players_1819 %>%
+  mutate(Valoracion=(PPG+RPG+APG+SPG+BPG)-((FGA-FGM)+(`3PA`-`3PM`)+(FTA-FTM)+TOV+PF)) %>%
+  arrange(desc(Valoracion)) %>%
+  select(Player, Valoracion) %>%
+  head(20) %>%
+  ggplot(aes(x=reorder(Player, Valoracion), y=Valoracion)) +
+  geom_bar(stat="identity", color="black", aes(fill=Valoracion), show.legend=FALSE) +
+  scale_fill_gradient(low="paleturquoise", high="paleturquoise4") +
+  geom_label(aes(label=Valoracion)) +
+  theme_bw() +
+  theme(axis.title.y=element_blank()) +
+  coord_flip() +
+  labs(title="Jugadores más valorados", subtitle="Temporada 2018/19",
+       y="Valoración")
+```
+
+¿Què hay de los equipos? ¿Qué equipos tienen una valoración por partido más alta?
+
+```{r fig.align='center'}
+# Equipos más valorados
+ACB_Teams_1819 %>%
+  mutate(Valoracion=(PPG+RPG+APG+SPG+BPG)-((FGA-FGM)+(`3PA`-`3PM`)+(FTA-FTM)+TOV+PF)) %>%
+  arrange(desc(Valoracion)) %>%
+  select(Team, Valoracion, Playoffs) %>%
+  ggplot(aes(x=reorder(Team, Valoracion), y=Valoracion)) +
+  geom_bar(stat="identity", color="black", aes(fill=Playoffs)) +
+  geom_label(aes(label=Valoracion)) +
+  theme_bw() +
+  theme(legend.position="bottom",
+        axis.title.y=element_blank()) +
+  coord_flip() +
+  labs(title="Equipos más valorados", subtitle="Temporada 2018/19", y="Valoración")
+```
+
+Aunque el cálculo de la valoración no sea preciso del todo (nos faltan tapones y faltas recibidas), parece que es un indicador muy fiable de cara a pronosticar si un equipo va a clasificarse en los Playoffs de la Liga Endesa o no. 8 de los 9 primeros equipos mejor valorados se clasificaron esta última temporada 2018/19. Curioso el caso del Manresa, que a pesar de ser de los equipos peores en valoración, consiguió ser uno de los 8 mejores equipos del año. 
+
+# **Comentarios finales**
+
+Por último, comentar que he disfrutado mucho elaborando este proyecto, teniendo la posibilidad de combinar el análisis de datos con el baloncesto... ¡qué más puedo pedir! :) Me hubiera gustado extraer más conclusiones o *insights* en algún que otro apartado (en el de correlaciones o estadística avanzada, por ejemplo), como también  analizar conjuntos de datos externos a los proporcionados por el reto para enriquecer más el análisis (jugada a jugada, estadísticas de jugadores o equipos partido a partido, etc.), y bueno... muchas otras cosas, pero al final el tiempo se me echó un poco encima. Independientemente del resultado, estoy seguro que el año que viene volveré a participar. ¡Es una iniciativa genial y se la recomendaría a cualquier persona interesada en la Ciencia de Datos!
+
+# **Referencias a librerías utilizadas**
+
+Alexander Walker (2019). openxlsx: Read, Write and Edit XLSX Files. R package version 4.1.0.1. https://CRAN.R-project.org/package=openxlsx
+
+Hadley Wickham (2017). tidyverse: Easily Install and Load the 'Tidyverse'. R package version 1.2.1 https://CRAN.R-project.org/package=tidyverse
+
+Yihui Xie (2019). knitr: A General-Purpose Package for Dynamic Report Generation in R. R package version 1.24.
+
+Jeroen Ooms (2019). magick: Advanced Graphics and Image-Processing in R. R package version 2.2. https://CRAN.R-project.org/package=magick
+
+R Core Team (2019). R: A language and environment for statistical computing. R Foundation for Statistical Computing, Vienna, Austria. URL https://www.R-project.org/
+
+Carson Sievert (2018) plotly for R. https://plotly-r.com
+
+Thomas Lin Pedersen and David Robinson (2019). gganimate: A Grammar of Animated Graphics. R package version 1.0.3. https://CRAN.R-project.org/package=gganimate
+
+Baptiste Auguie (2017). gridExtra: Miscellaneous Functions for "Grid" Graphics. R package version 2.3. https://CRAN.R-project.org/package=gridExtra
+
+Alboukadel Kassambara and Fabian Mundt (2017). factoextra: Extract and Visualize the Results of Multivariate Data Analyses. R package version 1.0.5. https://CRAN.R-project.org/package=factoextra
+
+Barret Schloerke, Jason Crowley, Di Cook, Francois Briatte, Moritz Marbach, Edwin Thoen, Amos Elberg and Joseph Larmarange (2018). GGally: Extension to 'ggplot2'. R package version 1.4.0. https://CRAN.R-project.org/package=GGally
+
+Max Kuhn. Contributions from Jed Wing, Steve Weston, Andre Williams, Chris Keefer, Allan Engelhardt, Tony Cooper, Zachary Mayer,
+Brenton Kenkel, the R Core Team, Michael Benesty, Reynald Lescarbeau, Andrew Ziem, Luca Scrucca, Yuan Tang, Can Candan and Tyler
+Hunt. (2019). caret: Classification and Regression Training. R package version 6.0-84. https://CRAN.R-project.org/package=caret
+
+Max Kuhn and Ross Quinlan (2018). C50: C5.0 Decision Trees and Rule-Based Models. R package version 0.1.2. https://CRAN.R-project.org/package=C50
+
+Taiyun Wei and Viliam Simko (2017). R package "corrplot": Visualization of a Correlation Matrix (Version 0.84). Available from https://github.com/taiyun/corrplot
