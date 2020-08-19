@@ -1,7 +1,7 @@
 # Data Science Awards 2019
 
 <!-- badges: start -->
-[![Ask Me Anything !](https://img.shields.io/badge/Ask%20me-anything-1abc9c.svg)](https://github.com/xavivg91/data-science-awards-spain-2019/issues/new)
+[![contributions welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat)](https://github.com/xavivg91/data-science-awards-spain-2019/issues/)
 [![HitCount](http://hits.dwyl.com/xavivg91/data-science-awards-spain-2019.svg)](http://hits.dwyl.com/xavivg91/data-science-awards-spain-2019)
 
 [![GitHub Xavi](https://img.shields.io/github/followers/xavivg91?label=follow&style=social)](https://github.com/xavivg91/)
